@@ -63,15 +63,17 @@ export function AgentOutputs() {
 
             <div className="space-y-3 text-sm">
                 {/* Confidence */}
-                <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-2 text-muted-foreground">
-                        <TrendingUp className="h-3 w-3" />
-                        Confidence
-                    </span>
-                    <Badge variant={confidence >= 0.8 ? "success" : confidence >= 0.5 ? "warning" : "destructive"}>
-                        {(confidence * 100).toFixed(0)}%
-                    </Badge>
-                </div>
+                {(confidence !== undefined && confidence !== null) && (
+                    <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-2 text-muted-foreground">
+                            <TrendingUp className="h-3 w-3" />
+                            Confidence
+                        </span>
+                        <Badge variant={confidence >= 0.8 ? "success" : confidence >= 0.5 ? "warning" : "destructive"}>
+                            {(confidence * 100).toFixed(0)}%
+                        </Badge>
+                    </div>
+                )}
 
                 {/* Language */}
                 <div className="flex items-center justify-between">

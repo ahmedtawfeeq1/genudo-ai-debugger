@@ -19,8 +19,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Panel, Group, Separator } from "react-resizable-panels";
-import { Wrench, Trash2, AlertCircle, Cpu, GitBranch, Layers, Code, GripVertical } from "lucide-react";
+import { Wrench, Trash2, AlertCircle, Settings, Cpu, GitBranch, Layers, Code } from "lucide-react";
 
 export default function Home() {
   const { clearMessages, error } = useDebuggerStore();
@@ -61,102 +60,85 @@ export default function Home() {
         }
       })()}
 
-      {/* Main Content - Resizable Panels */}
-      <Group orientation="horizontal" className="flex-1">
-        {/* Left Panel - Config */}
-        <Panel defaultSize={20} minSize={15} maxSize={35}>
-          <aside className="h-full border-r flex flex-col bg-card">
-            <ScrollArea className="flex-1">
-              <div className="p-3 space-y-2">
-                {/* Server Config - Always Visible */}
-                <ServerConfig />
+      {/* Main Content - New Layout: Config 25% | Chat 25% | Observability 50% */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Panel - Config (25%) */}
+        <aside className="w-1/4 min-w-[280px] max-w-[350px] border-r flex flex-col bg-card">
+          <ScrollArea className="flex-1">
+            <div className="p-3 space-y-2">
+              {/* Server Config - Always Visible */}
+              <ServerConfig />
 
-                {/* Collapsible Sections */}
-                <Accordion type="multiple" defaultValue={["llm"]} className="w-full">
-                  <AccordionItem value="llm">
-                    <AccordionTrigger className="py-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <Cpu className="h-4 w-4" />
-                        LLM Configuration
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <LLMConfig />
-                    </AccordionContent>
-                  </AccordionItem>
+              {/* Collapsible Sections */}
+              <Accordion type="multiple" defaultValue={["llm"]} className="w-full">
+                <AccordionItem value="llm">
+                  <AccordionTrigger className="py-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Cpu className="h-4 w-4" />
+                      LLM Configuration
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <LLMConfig />
+                  </AccordionContent>
+                </AccordionItem>
 
-                  <AccordionItem value="pipeline">
-                    <AccordionTrigger className="py-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <GitBranch className="h-4 w-4" />
-                        Pipeline Configuration
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <PipelineConfig />
-                    </AccordionContent>
-                  </AccordionItem>
+                <AccordionItem value="pipeline">
+                  <AccordionTrigger className="py-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <GitBranch className="h-4 w-4" />
+                      Pipeline Configuration
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <PipelineConfig />
+                  </AccordionContent>
+                </AccordionItem>
 
-                  <AccordionItem value="stage">
-                    <AccordionTrigger className="py-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <Layers className="h-4 w-4" />
-                        Stage Configuration
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <StageConfig />
-                    </AccordionContent>
-                  </AccordionItem>
+                <AccordionItem value="stage">
+                  <AccordionTrigger className="py-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Layers className="h-4 w-4" />
+                      Stage Configuration
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <StageConfig />
+                  </AccordionContent>
+                </AccordionItem>
 
-                  <AccordionItem value="payload">
-                    <AccordionTrigger className="py-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <Code className="h-4 w-4" />
-                        Payload Editor
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <PayloadEditor />
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              </div>
-            </ScrollArea>
-          </aside>
-        </Panel>
+                <AccordionItem value="payload">
+                  <AccordionTrigger className="py-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Code className="h-4 w-4" />
+                      Payload Editor
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <PayloadEditor />
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </div>
+          </ScrollArea>
+        </aside>
 
-        {/* Resize Handle */}
-        <Separator className="w-1.5 bg-border hover:bg-primary/50 transition-colors flex items-center justify-center group">
-          <GripVertical className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-        </Separator>
+        {/* Center Panel - Chat (remaining space) */}
+        <main className="flex-1 min-w-[280px] flex flex-col bg-background border-r">
+          <ChatContainer />
+          <ChatInput />
+        </main>
 
-        {/* Center Panel - Chat */}
-        <Panel defaultSize={45} minSize={25}>
-          <main className="h-full flex flex-col bg-background">
-            <ChatContainer />
-            <ChatInput />
-          </main>
-        </Panel>
-
-        {/* Resize Handle */}
-        <Separator className="w-1.5 bg-border hover:bg-primary/50 transition-colors flex items-center justify-center group">
-          <GripVertical className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-        </Separator>
-
-        {/* Right Panel - Observability */}
-        <Panel defaultSize={35} minSize={20} maxSize={50}>
-          <aside className="h-full border-l flex flex-col bg-card">
-            <ScrollArea className="flex-1">
-              <div className="p-4">
-                <ObservabilityPanel />
-              </div>
-            </ScrollArea>
-          </aside>
-        </Panel>
-      </Group>
+        {/* Right Panel - Observability (1/3) - Primary Focus */}
+        <aside className="w-1/3 min-w-[400px] flex flex-col bg-card">
+          <ScrollArea className="flex-1">
+            <div className="p-4">
+              <ObservabilityPanel />
+            </div>
+          </ScrollArea>
+        </aside>
+      </div>
     </div>
   );
 }
-
 
