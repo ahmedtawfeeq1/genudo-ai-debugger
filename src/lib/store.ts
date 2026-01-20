@@ -1,10 +1,16 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { Message, ChatRequest, ChatResponse, PipelineConfig, StageConfig } from "./types";
+import { Message, ChatRequest, ChatResponse, PipelineConfig, StageConfig, FileConfig, getCurrentStage } from "./types";
 import { createSamplePayload } from "./sample-payload";
-import { PREDEFINED_STAGES, StageDefinition } from "./stages-data";
+
+// Active tab type
+export type ActiveTab = "chat" | "settings";
 
 interface DebuggerState {
+    // Active tab
+    activeTab: ActiveTab;
+    setActiveTab: (tab: ActiveTab) => void;
+
     // Config
     baseUrl: string;
     apiKey: string;
@@ -12,19 +18,23 @@ interface DebuggerState {
     setBaseUrl: (url: string) => void;
     setApiKey: (key: string) => void;
     setStreamingEnabled: (enabled: boolean) => void;
+    forceRTL: boolean;
+    setForceRTL: (enabled: boolean) => void;
 
-    // Payload
+    // Payload (single source of truth)
     payload: ChatRequest;
     setPayload: (payload: ChatRequest) => void;
     updatePipeline: (updates: Partial<PipelineConfig>) => void;
-    updateStage: (updates: Partial<StageConfig>) => void;
-    setStage: (stage: StageConfig) => void;
+    updateOpportunityStageId: (stageId: number) => void;
+    updateStageInList: (stageId: number, updates: Partial<StageConfig>) => void;
     updateUserMessage: (message: string) => void;
+    updateFiles: (files: FileConfig[]) => void;
+    updateFileInList: (fileId: number, updates: Partial<FileConfig>) => void;
 
     // Chat
     messages: Message[];
     addMessage: (message: Message) => void;
-    updateLastAssistantMessage: (content: string) => void;
+    updateLastAssistantMessage: (content: string, response?: ChatResponse) => void;
     clearMessages: () => void;
     isStreaming: boolean;
     setIsStreaming: (streaming: boolean) => void;
@@ -33,18 +43,27 @@ interface DebuggerState {
     currentResponse: ChatResponse | null;
     setCurrentResponse: (response: ChatResponse | null) => void;
 
+    // UI State
+    isObservabilityVisible: boolean;
+    toggleObservability: () => void;
+    isConfigPanelVisible: boolean;
+    toggleConfigPanel: () => void;
+
     // Error state
     error: string | null;
     setError: (error: string | null) => void;
 
-    // Stages Database
-    stagesList: StageDefinition[];
-    setStagesList: (stages: StageDefinition[]) => void;
+    // Helper to get current stage
+    getCurrentStage: () => StageConfig | undefined;
 }
 
 export const useDebuggerStore = create<DebuggerState>()(
     persist(
         (set, get) => ({
+            // Active tab
+            activeTab: "chat",
+            setActiveTab: (tab) => set({ activeTab: tab }),
+
             // Config
             baseUrl: process.env.NEXT_PUBLIC_DEFAULT_BASE_URL || "https://stagingaicore.loop-x.co",
             apiKey: "",
@@ -52,8 +71,10 @@ export const useDebuggerStore = create<DebuggerState>()(
             setBaseUrl: (url) => set({ baseUrl: url }),
             setApiKey: (key) => set({ apiKey: key }),
             setStreamingEnabled: (enabled) => set({ isStreamingEnabled: enabled }),
+            forceRTL: false,
+            setForceRTL: (enabled) => set({ forceRTL: enabled }),
 
-            // Payload
+            // Payload (single source of truth)
             payload: createSamplePayload(),
             setPayload: (payload) => set({ payload }),
             updatePipeline: (updates) =>
@@ -63,18 +84,20 @@ export const useDebuggerStore = create<DebuggerState>()(
                         pipeline: { ...state.payload.pipeline, ...updates },
                     },
                 })),
-            updateStage: (updates) =>
+            updateOpportunityStageId: (stageId) =>
                 set((state) => ({
                     payload: {
                         ...state.payload,
-                        stage: { ...state.payload.stage, ...updates },
+                        opportunity: { ...state.payload.opportunity, stage_id: stageId },
                     },
                 })),
-            setStage: (stage) =>
+            updateStageInList: (stageId, updates) =>
                 set((state) => ({
                     payload: {
                         ...state.payload,
-                        stage,
+                        stages: state.payload.stages.map((s) =>
+                            s.id === stageId ? { ...s, ...updates } : s
+                        ),
                     },
                 })),
             updateUserMessage: (message) =>
@@ -88,21 +111,50 @@ export const useDebuggerStore = create<DebuggerState>()(
                         ),
                     },
                 })),
+            updateFiles: (files) =>
+                set((state) => ({
+                    payload: {
+                        ...state.payload,
+                        files,
+                    },
+                })),
+            updateFileInList: (fileId, updates) =>
+                set((state) => ({
+                    payload: {
+                        ...state.payload,
+                        files: state.payload.files.map((f) =>
+                            f.id === fileId ? { ...f, ...updates } : f
+                        ),
+                    },
+                })),
 
             // Chat
             messages: [],
             addMessage: (message) =>
                 set((state) => ({ messages: [...state.messages, message] })),
-            updateLastAssistantMessage: (content) =>
+            updateLastAssistantMessage: (content, response) =>
                 set((state) => {
                     const messages = [...state.messages];
                     const lastIdx = messages.length - 1;
                     if (lastIdx >= 0 && messages[lastIdx].role === "assistant") {
-                        messages[lastIdx] = { ...messages[lastIdx], content };
+                        messages[lastIdx] = {
+                            ...messages[lastIdx],
+                            content,
+                            ...(response && { response })
+                        };
                     }
                     return { messages };
                 }),
-            clearMessages: () => set({ messages: [], currentResponse: null, error: null }),
+            clearMessages: () =>
+                set((state) => ({
+                    messages: [],
+                    currentResponse: null,
+                    error: null,
+                    payload: {
+                        ...state.payload,
+                        history: [],
+                    },
+                })),
             isStreaming: false,
             setIsStreaming: (streaming) => set({ isStreaming: streaming }),
 
@@ -110,13 +162,23 @@ export const useDebuggerStore = create<DebuggerState>()(
             currentResponse: null,
             setCurrentResponse: (response) => set({ currentResponse: response }),
 
+            // UI State
+            isObservabilityVisible: true,
+            toggleObservability: () =>
+                set((state) => ({ isObservabilityVisible: !state.isObservabilityVisible })),
+            isConfigPanelVisible: true,
+            toggleConfigPanel: () =>
+                set((state) => ({ isConfigPanelVisible: !state.isConfigPanelVisible })),
+
             // Error
             error: null,
             setError: (error) => set({ error }),
 
-            // Stages Database
-            stagesList: PREDEFINED_STAGES,
-            setStagesList: (stages) => set({ stagesList: stages }),
+            // Helper to get current stage
+            getCurrentStage: () => {
+                const state = get();
+                return getCurrentStage(state.payload);
+            },
         }),
         {
             name: "genudo-debugger-storage",
@@ -124,7 +186,9 @@ export const useDebuggerStore = create<DebuggerState>()(
                 baseUrl: state.baseUrl,
                 apiKey: state.apiKey,
                 isStreamingEnabled: state.isStreamingEnabled,
-                stagesList: state.stagesList, // Persist custom stages
+                forceRTL: state.forceRTL,
+                // Persist the full payload as session data
+                payload: state.payload,
             }),
         }
     )

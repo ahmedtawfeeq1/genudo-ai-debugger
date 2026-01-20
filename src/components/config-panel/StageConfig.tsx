@@ -3,7 +3,9 @@
 import { useDebuggerStore } from "@/lib/store";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Webhook } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Webhook, Settings } from "lucide-react";
+import { getCurrentStage } from "@/lib/types";
 
 import {
     Select,
@@ -12,79 +14,67 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { StagesDatabaseEditor } from "./StagesDatabaseEditor";
 
 export function StageConfig() {
-    const { payload, setStage, stagesList } = useDebuggerStore();
-    const { name, actions } = payload.stage;
+    const { payload, updateOpportunityStageId, setActiveTab } = useDebuggerStore();
+
+    const currentStage = getCurrentStage(payload);
+    const currentStageName = currentStage?.name || "";
 
     const handleStageSelect = (stageName: string) => {
-        const stage = stagesList.find(s => s.name === stageName);
+        const stage = payload.stages.find(s => s.name === stageName);
         if (stage) {
-            // Replace entire stage object including actions
-            setStage(stage);
+            updateOpportunityStageId(stage.id);
+        }
+    };
+
+    const getNatureBadgeVariant = (nature: string | undefined) => {
+        switch (nature) {
+            case "wining": return "success";
+            case "lost": return "destructive";
+            default: return "secondary";
         }
     };
 
     return (
-        <div className="space-y-3">
-            <StagesDatabaseEditor />
+        <div className="space-y-3 w-full overflow-hidden">
 
-            <div className="space-y-2">
-                <Label>Select Stage</Label>
-                <Select value={name} onValueChange={handleStageSelect}>
-                    <SelectTrigger>
-                        <SelectValue placeholder="Select a stage..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {stagesList.map((stage) => (
-                            <SelectItem key={stage.id} value={stage.name}>
-                                {stage.name}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
+            <Select value={currentStageName} onValueChange={handleStageSelect}>
+                <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a stage..." />
+                </SelectTrigger>
+                <SelectContent>
+                    {payload.stages.map((stage) => (
+                        <SelectItem key={stage.id} value={stage.name}>
+                            <div className="flex items-center gap-2 max-w-[220px]">
+                                <span className="truncate">{stage.name}</span>
+                                <Badge variant={getNatureBadgeVariant(stage.nature)} className="text-xs">
+                                    {stage.nature}
+                                </Badge>
+                            </div>
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+
 
             {/* Current Stage Info */}
-            <div className="p-2 rounded-md bg-secondary/30 text-xs space-y-1">
-                <div><strong>ID:</strong> {payload.stage.id}</div>
-                <div><strong>Name:</strong> {payload.stage.name}</div>
-                <div><strong>Condition:</strong> {payload.stage.enter_condition || "None"}</div>
-            </div>
-
-            {/* Actions from Stage */}
-            <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                    <Webhook className="h-4 w-4 text-muted-foreground" />
-                    <Label>Actions ({actions?.length || 0})</Label>
-                </div>
-                {(!actions || actions.length === 0) ? (
-                    <p className="text-xs text-muted-foreground">No actions for this stage</p>
-                ) : (
-                    <div className="space-y-1">
-                        {actions.map((action) => (
-                            <div
-                                key={action.id}
-                                className="flex items-center justify-between p-2 rounded-md bg-secondary/50"
-                            >
-                                <span className="text-xs">{action.name}</span>
-                                <div className="flex items-center gap-1">
-                                    <Badge variant="outline" className="text-xs">
-                                        {action.type}
-                                    </Badge>
-                                    <Badge
-                                        variant={action.is_active ? "success" : "secondary"}
-                                        className="text-xs"
-                                    >
-                                        {action.is_active ? "On" : "Off"}
-                                    </Badge>
-                                </div>
+            {
+                currentStage && (
+                    <>
+                        <div className="p-2 rounded-md bg-secondary/30 text-xs space-y-1 w-full overflow-hidden">
+                            <div className="flex justify-between">
+                                <span><strong>ID:</strong> {currentStage.id}</span>
+                                <Badge variant={getNatureBadgeVariant(currentStage.nature)}>
+                                    {currentStage.nature}
+                                </Badge>
                             </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-        </div>
+                            <div className="truncate"><strong>Name:</strong> {currentStage.name}</div>
+
+                        </div>
+                    </>
+                )
+            }
+        </div >
     );
 }

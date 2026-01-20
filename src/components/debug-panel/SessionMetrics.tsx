@@ -1,8 +1,16 @@
 "use client";
 
 import { useDebuggerStore } from "@/lib/store";
-import { Coins, Clock, MessageSquare, Zap } from "lucide-react";
+import { Coins, Clock, MessageSquare, Zap, Activity } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import {
+    AreaChart,
+    Area,
+    XAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer,
+} from "recharts";
 
 export function SessionMetrics() {
     const { messages } = useDebuggerStore();
@@ -28,12 +36,31 @@ export function SessionMetrics() {
     const totalTimeMs = assistantMessages.reduce((acc, m) => acc + (m.response?.processing_time_ms || 0), 0);
     const avgLatency = assistantCount > 0 ? totalTimeMs / assistantCount : 0;
 
+    // Prepare Chart Data
+    let cumulativeTokens = 0;
+    let cumulativeCost = 0;
+
+    const chartData = assistantMessages.map((m, index) => {
+        const usage = m.response?.usage;
+        const tokens = usage?.total_tokens || 0;
+        const cost = usage?.grand_total_cost || usage?.total_cost || 0;
+
+        cumulativeTokens += tokens;
+        cumulativeCost += cost;
+
+        return {
+            name: `${index + 1}`,
+            tokens: cumulativeTokens,
+            cost: cumulativeCost,
+        };
+    });
+
     if (totalMessages === 0) {
         return <div className="text-sm text-muted-foreground">No session data yet.</div>;
     }
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-6">
             {/* Stats Cards Row */}
             <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 border rounded-md bg-card shadow-sm">
@@ -79,6 +106,57 @@ export function SessionMetrics() {
                     </div>
                 </div>
             </div>
+
+            <Separator />
+
+            {/* Charts */}
+            {assistantCount > 0 && (
+                <div className="space-y-6">
+                    {/* Cost Chart */}
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                            <Activity className="h-3 w-3" /> Growing Cost ($)
+                        </div>
+                        <div className="h-[120px] w-full border rounded-md p-2 bg-card/50">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} vertical={false} />
+                                    <XAxis dataKey="name" hide />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '6px', border: '1px solid hsl(var(--border))', fontSize: '12px' }}
+                                        itemStyle={{ color: 'hsl(var(--foreground))' }}
+                                        formatter={(value: any) => [`$${Number(value).toFixed(6)}`, "Cost"]}
+                                        labelFormatter={(label: any) => `Message ${label}`}
+                                    />
+                                    <Area type="monotone" dataKey="cost" stroke="#22c55e" fill="#22c55e" fillOpacity={0.2} isAnimationActive={false} />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* Tokens Chart */}
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                            <Zap className="h-3 w-3" /> Growing Tokens
+                        </div>
+                        <div className="h-[120px] w-full border rounded-md p-2 bg-card/50">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} vertical={false} />
+                                    <XAxis dataKey="name" hide />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '6px', border: '1px solid hsl(var(--border))', fontSize: '12px' }}
+                                        itemStyle={{ color: 'hsl(var(--foreground))' }}
+                                        formatter={(value: any) => [Number(value).toLocaleString(), "Tokens"]}
+                                        labelFormatter={(label: any) => `Message ${label}`}
+                                    />
+                                    <Area type="monotone" dataKey="tokens" stroke="#eab308" fill="#eab308" fillOpacity={0.2} isAnimationActive={false} />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

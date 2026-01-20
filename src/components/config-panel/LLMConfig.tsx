@@ -12,6 +12,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Cpu } from "lucide-react";
+import { MODEL_PRICING } from "@/lib/pricing";
 
 export function LLMConfig() {
     const { payload, updatePipeline } = useDebuggerStore();
@@ -27,10 +28,7 @@ export function LLMConfig() {
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <Cpu className="h-4 w-4" />
-                LLM Configuration
-            </div>
+
 
             <div className="space-y-3">
                 <div className="space-y-2">
@@ -42,7 +40,13 @@ export function LLMConfig() {
                             // Reset model when provider changes
                             const firstModel = LLM_PROVIDERS[value as ProviderId]?.models[0];
                             if (firstModel) {
-                                updatePipeline({ ai_model: firstModel.id });
+                                const inputPrice = MODEL_PRICING[`${firstModel.id}:input`];
+                                const outputPrice = MODEL_PRICING[`${firstModel.id}:output`];
+                                updatePipeline({
+                                    ai_model: firstModel.id,
+                                    input_price: inputPrice !== undefined ? inputPrice.toString() : undefined,
+                                    output_price: outputPrice !== undefined ? outputPrice.toString() : undefined
+                                });
                             }
                         }}
                     >
@@ -63,7 +67,15 @@ export function LLMConfig() {
                     <Label>Model</Label>
                     <Select
                         value={ai_model}
-                        onValueChange={(value) => updatePipeline({ ai_model: value })}
+                        onValueChange={(value) => {
+                            const inputPrice = MODEL_PRICING[`${value}:input`];
+                            const outputPrice = MODEL_PRICING[`${value}:output`];
+                            updatePipeline({
+                                ai_model: value,
+                                input_price: inputPrice !== undefined ? inputPrice.toString() : undefined,
+                                output_price: outputPrice !== undefined ? outputPrice.toString() : undefined
+                            });
+                        }}
                     >
                         <SelectTrigger>
                             <SelectValue placeholder="Select model" />
@@ -82,12 +94,12 @@ export function LLMConfig() {
                     <div className="flex items-center justify-between">
                         <Label>Temperature</Label>
                         <span className="text-sm text-muted-foreground">
-                            {model_temperature.toFixed(1)}
+                            {parseFloat(model_temperature).toFixed(1)}
                         </span>
                     </div>
                     <Slider
-                        value={[model_temperature]}
-                        onValueChange={([value]) => updatePipeline({ model_temperature: value })}
+                        value={[parseFloat(model_temperature) || 0.4]}
+                        onValueChange={([value]) => updatePipeline({ model_temperature: value.toString() })}
                         min={0}
                         max={2}
                         step={0.1}

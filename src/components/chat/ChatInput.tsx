@@ -70,31 +70,49 @@ export function ChatInput() {
                     }
 
                     if (chunk.done && chunk.response) {
-                        // Update with final response
+                        // Update with final response (handle multiple messages)
                         setCurrentResponse(chunk.response);
-                        updateLastAssistantMessage(chunk.response.ai_response);
+
+                        const responseMessages = chunk.response.ai_responses && chunk.response.ai_responses.length > 0
+                            ? chunk.response.ai_responses
+                            : [chunk.response.ai_response];
+
+                        responseMessages.forEach((msg, index) => {
+                            const isLast = index === responseMessages.length - 1;
+                            if (index === 0) {
+                                updateLastAssistantMessage(msg, isLast ? chunk.response : undefined);
+                            } else {
+                                addMessage({
+                                    id: "assistant_" + Date.now() + "_" + index,
+                                    role: "assistant",
+                                    content: msg,
+                                    timestamp: new Date(),
+                                    response: isLast ? chunk.response : undefined
+                                });
+                            }
+                        });
+
 
                         // Update history for next request
+                        const aiHistoryMessages = responseMessages.map((msg, i) => ({
+                            id: assistantMsgId + "_" + i,
+                            role: "assistant" as const,
+                            message: msg,
+                        }));
+
                         const newHistory = [
                             ...payload.history,
                             {
                                 id: userMsgId,
                                 role: "user" as const,
                                 message: userMessage,
-                                channel_id: payload.messages[0]?.channel_id || 1,
-                                contact_id: payload.messages[0]?.contact_id || 1,
-                                opportunity_id: payload.messages[0]?.opportunity_id || 1,
                             },
-                            {
-                                id: assistantMsgId,
-                                role: "assistant" as const,
-                                message: chunk.response.ai_response,
-                                channel_id: payload.messages[0]?.channel_id || 1,
-                                contact_id: payload.messages[0]?.contact_id || 1,
-                                opportunity_id: payload.messages[0]?.opportunity_id || 1,
-                            },
+                            ...aiHistoryMessages,
                         ];
-                        setPayload({ ...updatedPayload, history: newHistory });
+                        const nextStageId = chunk.response.stage_transition?.to_stage_id;
+                        const newOpportunity = nextStageId ? { ...updatedPayload.opportunity, stage_id: nextStageId } : updatedPayload.opportunity;
+
+                        setPayload({ ...updatedPayload, history: newHistory, opportunity: newOpportunity });
                     }
                 }
             } else {
@@ -103,30 +121,46 @@ export function ChatInput() {
 
                 setCurrentResponse(response);
 
-                // Show response instantly
-                updateLastAssistantMessage(response.ai_response);
+                // Show response (handle multiple messages)
+                const responseMessages = response.ai_responses && response.ai_responses.length > 0
+                    ? response.ai_responses
+                    : [response.ai_response];
+
+                responseMessages.forEach((msg, index) => {
+                    const isLast = index === responseMessages.length - 1;
+                    if (index === 0) {
+                        updateLastAssistantMessage(msg, isLast ? response : undefined);
+                    } else {
+                        addMessage({
+                            id: "assistant_" + Date.now() + "_" + index,
+                            role: "assistant",
+                            content: msg,
+                            timestamp: new Date(),
+                            response: isLast ? response : undefined
+                        });
+                    }
+                });
 
                 // Update history for next request
+                const aiHistoryMessages = responseMessages.map((msg, i) => ({
+                    id: assistantMsgId + "_" + i,
+                    role: "assistant" as const,
+                    message: msg,
+                }));
+
                 const newHistory = [
                     ...payload.history,
                     {
                         id: userMsgId,
                         role: "user" as const,
                         message: userMessage,
-                        channel_id: payload.messages[0]?.channel_id || 1,
-                        contact_id: payload.messages[0]?.contact_id || 1,
-                        opportunity_id: payload.messages[0]?.opportunity_id || 1,
                     },
-                    {
-                        id: assistantMsgId,
-                        role: "assistant" as const,
-                        message: response.ai_response,
-                        channel_id: payload.messages[0]?.channel_id || 1,
-                        contact_id: payload.messages[0]?.contact_id || 1,
-                        opportunity_id: payload.messages[0]?.opportunity_id || 1,
-                    },
+                    ...aiHistoryMessages,
                 ];
-                setPayload({ ...updatedPayload, history: newHistory });
+                const nextStageId = response.stage_transition?.to_stage_id;
+                const newOpportunity = nextStageId ? { ...updatedPayload.opportunity, stage_id: nextStageId } : updatedPayload.opportunity;
+
+                setPayload({ ...updatedPayload, history: newHistory, opportunity: newOpportunity });
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : "Unknown error";

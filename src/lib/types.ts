@@ -10,37 +10,51 @@ export interface MediaAttachment {
     size?: number;
 }
 
+// Simplified IncomingMessage matching new payload structure
 export interface IncomingMessage {
     id: string;
-    external_channel_id: string;
-    external_message_id: string;
-    external_chat_id: string;
-    sender_identifier: string;
-    sender_external_id: string;
-    sender_name?: string;
-    sender_phone?: string;
     message: string;
-    role: "user" | "assistant" | "system";
-    status: string;
-    media?: MediaAttachment | null;
-    created_at: string;
-    updated_at: string;
-    channel_id: number;
-    contact_id: number;
     conversation_id: number;
-    opportunity_id: number;
-    pipeline_id: number;
-    stage_id: number;
-    subscription_benefit_id?: number | null;
+    media?: MediaAttachment | null;
 }
 
+// Simplified HistoryMessage matching new payload structure
 export interface HistoryMessage {
     id: string;
     role: "user" | "assistant" | "system";
     message: string;
-    channel_id: number;
-    contact_id: number;
-    opportunity_id: number;
+}
+
+// ============================================
+// Opportunity & Contact Types
+// ============================================
+
+export interface OpportunityConfig {
+    id: number;
+    name: string | null;
+    notes: string | null;
+    stage_id: number;
+    created_at: string;
+}
+
+export interface ContactConfig {
+    id: number;
+    name: string;
+    phone: string;
+    email: string | null;
+    created_at: string;
+}
+
+// ============================================
+// File/Knowledge Source Types
+// ============================================
+
+export interface FileConfig {
+    id: number;
+    title: string | null;
+    usage_description: string | null;
+    trained_at: string | null;
+    size_formatted: string | null;
 }
 
 // ============================================
@@ -65,7 +79,7 @@ export interface PipelineConfig {
     status: "active" | "inactive" | "draft";
     ai_provider: string;
     ai_model: string;
-    model_temperature: number;
+    model_temperature: string; // Changed to string to match payload
     rag_mode: "normal" | "strict" | "disabled";
     files_mode: "text" | "vision" | "hybrid";
     chat_history_mode: "user" | "assistant" | "both" | "none";
@@ -75,6 +89,8 @@ export interface PipelineConfig {
     ai_persona?: string | null;
     description?: string | null;
     instructions?: string | null;
+    input_price?: string;
+    output_price?: string;
     routing_model?: string | null;
     routing_provider?: string | null;
     rag_model?: string | null;
@@ -90,6 +106,8 @@ export interface WebhookField {
     is_required: boolean;
     notes?: string | null;
     example?: string | null;
+    created_at?: string;
+    updated_at?: string;
 }
 
 export interface WebhookActionable {
@@ -108,37 +126,23 @@ export interface StageActionConfig {
     name: string;
     description?: string | null;
     type: "webhook" | "email" | "calendar";
-    fixed_trigger?: "stage_started" | "stage_ended" | "on_message" | "ai_decision" | null;
-    trigger_id?: number | null;
-    instructions?: string | null;
-    is_active: boolean;
-    stage_id: number;
-    pipeline_id: number;
     actionable_type?: string | null;
     actionable_id?: number | null;
+    stage_id: number;
+    instructions?: string | null;
     actionable?: WebhookActionable | null;
-    created_at?: string;
-    updated_at?: string;
 }
 
 export interface StageConfig {
     id: number;
     name: string;
-    pipeline_id: number;
-    parent_id?: number | null;
-    order?: number | null;
-    nature?: string | null;
+    nature: "neutral" | "wining" | "lost" | string; // Allow string for flexibility
+    ai_persona?: string | null;
     instructions?: string | null;
-    enter_condition?: string | null;
+    description?: string | null;
     notes?: string | null;
-    actions: StageActionConfig[];
-}
-
-export interface StageEnterCondition {
-    id: number;
-    name: string;
-    pipeline_id: number;
     enter_condition?: string | null;
+    actions: StageActionConfig[];
 }
 
 // ============================================
@@ -147,23 +151,37 @@ export interface StageEnterCondition {
 
 export interface ChatRequest {
     messages: IncomingMessage[];
-    history: HistoryMessage[];
+    stages: StageConfig[];
     pipeline: PipelineConfig;
-    stage: StageConfig;
-    stages_enter_conditions: StageEnterCondition[];
-    stage_actions: unknown[];
-    pipeline_triggers: unknown[];
-    stage_triggers: unknown[];
+    opportunity: OpportunityConfig;
+    contact: ContactConfig;
+    files: FileConfig[];
+    history: HistoryMessage[];
     opportunity_followup_id?: number | null;
-    source_names?: string[] | null;
-    actions_data: unknown[];
 }
 
 export interface ExecutedAction {
     action_id: number;
     action_name: string;
     success: boolean;
+    action_type?: string;
     payload?: Record<string, unknown>;
+    response_body?: unknown;
+    error_message?: string;
+    executed_at?: string;
+    duration_ms?: number;
+    triggered_by?: string;
+    url?: string;
+    response_status?: number;
+}
+
+export interface StageTransition {
+    from_stage_id: number;
+    from_stage_name: string;
+    to_stage_id: number;
+    to_stage_name: string;
+    reason?: string | null;
+    condition_matched?: string | null;
 }
 
 export interface ResponseFlags {
@@ -196,8 +214,9 @@ export interface ChatResponse {
     reference_message_id: string;
     trace_id?: string;
     ai_response: string;
+    ai_responses?: string[];
     new_stage_name?: string | null;
-    stage_transition?: unknown | null;
+    stage_transition?: StageTransition | null;
     flags: ResponseFlags;
     rag_context?: unknown;
     memory_update?: unknown;
@@ -224,4 +243,12 @@ export interface Message {
     content: string;
     timestamp: Date;
     response?: ChatResponse;
+}
+
+// ============================================
+// Helper function to get current stage from payload
+// ============================================
+
+export function getCurrentStage(payload: ChatRequest): StageConfig | undefined {
+    return payload.stages.find(s => s.id === payload.opportunity.stage_id);
 }
